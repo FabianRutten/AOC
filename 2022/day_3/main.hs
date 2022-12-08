@@ -26,5 +26,3 @@ evalRucksackString = (\(x,y) -> fromJust $ find (`elem` y ) x) . (\x-> splitAt (
 getPrio :: Char -> Int
 getPrio c = let o = ord c - 96
             in if o < 0 then o + 58 else o
-
-type Rucksack = (String,String)
