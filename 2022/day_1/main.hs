@@ -7,7 +7,7 @@ main = do
     print $ partTwo input -- partOne for part one awnser
 
 partOne :: String -> Int
-partOne str = maximum $ map sum $ elves str
+partOne = maximum . map sum . elves
 
 partTwo :: String -> Int
 partTwo str = sum $ take 3 $ sortedBymax summed
