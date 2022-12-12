@@ -8,29 +8,48 @@ import GHC.IO (evaluate)
 
 main :: IO ()
 main = do
-    input <- readFile "example.txt"
+    input <- readFile "input.txt"
     let parsed = justParse input
     evaluate parsed
     print "parsing completed"
-    mapM_ putStrLn $ printDir parsed
-    print $ partOne parsed
+    printRoot parsed
+    print $ partTwo parsed
 
+printRoot :: DirItem -> IO ()
+printRoot dir = do mapM_ putStrLn $ printDir dir
+
+--magic numbers
 partOneMaxSize :: Int
 partOneMaxSize = 100000
+partTwoTotal :: Int
+partTwoTotal = 70000000
+partTwoMin :: Int
+partTwoMin = 30000000
 
 partOne :: DirItem -> String
-partOne = show . dirSize . filterSizes
+partOne = show . sum . getSizes (\x-> dirItemSize x <= partOneMaxSize) []
 
-filterSizes :: DirItem -> DirItem --output is filtered root
-filterSizes f@File{} = f
-filterSizes dir      = dir{contents = map filterSizes $ filter (\x-> dirItemSize x <= partOneMaxSize)(contents dir)}
+partTwo :: DirItem -> String
+partTwo = show . minimum . (\x-> filter (>= minSize x ) $ getSizes (const True) [] x)
+
+minSize :: DirItem -> Int
+minSize root = partTwoMin - (partTwoTotal - dirItemSize root)
+
+getSizes :: (DirItem -> Bool) -> [Int] -> DirItem -> [Int]
+getSizes _ xs f@File {} = xs
+getSizes _ xs (Dir _ []) = xs
+getSizes pred xs d | pred d = dirItemSize d : rest ++ xs
+                   | otherwise =  rest ++ xs
+    where
+        rest = concatMap (getSizes pred []) (contents d)
+
+filterSizes :: (DirItem -> Bool) -> DirItem -> DirItem --output is filtered root
+filterSizes _ f@File{} = f
+filterSizes pred dir   = dir{contents = map (filterSizes pred) $ filter pred (contents dir)}
 
 isNotFile :: DirItem -> Bool
 isNotFile f@File {} = False
 isNotFile _ = True
-
-partPrint :: String -> [String]
-partPrint = printDir . justParse
 
 justParse :: String -> DirItem
 justParse str = runAllCommands ((tail . parseInput) str) makeRoot []
@@ -41,26 +60,18 @@ runAllCommands (x:xs) root index  = uncurry (runAllCommands xs) $ runCommand x r
 
 runCommand :: Command ->  DirItem -> DirItemIndex -> (DirItem, DirItemIndex)
 runCommand c@(LS xs) root index  = (addContent index root $ map parseDirItem xs, index)
-runCommand c@(CD dir) root current = (root ,cdCommand root dir current)
+runCommand c@(CD dirName) root index = (root ,cdCommand root dirName index)
 
 makeRoot :: DirItem
 makeRoot = Dir "/" []
 
+getContentFromDirIndex :: DirItemIndex -> DirItem -> [DirItem]
+getContentFromDirIndex [] dir = contents dir
+getContentFromDirIndex (x:xs) dir = getContentFromDirIndex xs (contents dir!!x)
+
 parentDir :: DirItemIndex -> DirItemIndex
 parentDir [] = error "root has no parent"
 parentDir xs = init xs
-
-contentDir :: DirItem -> [String]
-contentDir f@File {} = [name f] -- maybe needs error
-contentDir (Dir _ dirs) = map name dirs
-
-isRoot :: DirItem -> Bool
-isRoot File {} = False
-isRoot dir = name dir == "/"
-
-isName :: String -> DirItem ->  Bool
-isName str f@File {} = name f == str
-isName str dir  = name dir == str
 
 dirItemSize :: DirItem -> Int
 dirItemSize f@File {} = size f
@@ -68,10 +79,9 @@ dirItemSize (Dir _ []) = 0
 dirItemSize dir = (sum . map dirItemSize) $ contents dir
 
 dirSize :: DirItem -> Int
-dirSize f@File {} = error"file dirSize is not possible"
+dirSize f@File {} = 0
 dirSize (Dir _ []) = 0
-dirSize dir | allFiles (contents dir) = dirItemSize dir
-            | otherwise = dirItemSize dir + (sum . map dirSize) (filter isNotFile $ contents dir)
+dirSize dir = dirItemSize dir + (sum . map dirSize) (contents dir)
 
 allFiles :: [DirItem] -> Bool
 allFiles = all isNotFile
@@ -79,11 +89,12 @@ allFiles = all isNotFile
 cdCommand :: DirItem -> String -> DirItemIndex -> DirItemIndex
 cdCommand _ "/" _ = []
 cdCommand _ ".." index = parentDir index
-cdCommand dir str index = index ++ listOrNothing (findIndex (\x-> name x == str) (contents dir))-- oei buggs?
+cdCommand root str index = index ++ [findDirIndex 0 str (getContentFromDirIndex index root)]-- oei buggs?
 
-listOrNothing :: Maybe a -> [a]
-listOrNothing Nothing = []
-listOrNothing (Just a) = [a]
+findDirIndex :: Int -> String -> [DirItem] -> Int
+findDirIndex i str [] = error ("no '" ++ str ++ "' in '" ++ "directory" ++ "', ended at: " ++ show i)
+findDirIndex i str (x:xs) | name x == str = i
+                            | otherwise = findDirIndex (i+1) str xs
 
 addContent :: DirItemIndex -> DirItem -> [DirItem] -> DirItem
 addContent _ f@File{} new = error "no contents in files"
@@ -108,15 +119,11 @@ parseCommand :: [String] -> Command
 parseCommand str | head str == "$ ls" = LS $ tail str
                  | otherwise = CD $ drop 5 $ head str
 
-both :: (a -> Bool) -> a -> a -> Bool
-both f a b = f a && f b
-
 parseDirItem :: String -> DirItem
 parseDirItem str | take 3 str == "dir" = Dir (drop 4 str) []
                  | otherwise = File (last split) (read $ head split)
     where
         split = splitOn " " str
-
 
 printDir :: DirItem -> [String]
 printDir f@File {} = ["- " ++ name f ++ " (size : " ++ (show . size) f ++ ")"]
