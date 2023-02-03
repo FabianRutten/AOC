@@ -6,9 +6,11 @@ main :: IO ()
 main = do
     input <- readFile "example.txt"
     print $ parseMotions input
+    print $ partOne input
 
 
-partOne = undefined
+partOne :: String -> Int
+partOne = Set.size . doAllMotions (0,0) (0,0) . parseMotions
 
 parseMotions :: String -> [Motion]
 parseMotions = map f . lines
@@ -21,30 +23,56 @@ parseMotions = map f . lines
         q 'D' = D
         q _   = error "unknown motion"
 
-iterateMotion :: Set.Set Loc -> Loc -> Loc -> Motion
-iterateMotion = undefined
+doAllMotions ::Pos -> Pos ->  [Motion] -> Set.Set Pos
+doAllMotions head tail = (\(set,_,_)-> set) . flip f (Set.singleton tail, head, tail)
+    where
+        f [] result     = result
+        f (x:xs) result = f xs $ iterateMotion result x
 
-doMotionHead :: Loc -> Motion 
-                -> (Loc ,Motion)
-doMotionHead = undefined
+iterateMotion :: (Set.Set Pos ,  Pos , Pos )-> Motion -> (Set.Set Pos ,Pos, Pos)
+iterateMotion (set , head , tail) motion | motionEmpty motion = (set,head,tail)
+                                   | otherwise          = iterateMotion (newSet , newHead , newTail) newMotion
+    where
+        (newHead,newMotion) = doMotionHead head motion
+        (newSet, newTail)   = checkMotionTail set newHead tail
 
-checkMotionTail :: Set.Set Loc -> Loc -> Loc -> (Set.Set Loc , Loc)
+doMotionHead :: Pos -> Motion -> (Pos , Motion)        
+doMotionHead (x,y) (L i) = ((x-i,y),L (i-1))
+doMotionHead (x,y) (R i) = ((x+i,y),R (i-1))
+doMotionHead (x,y) (U i) = ((x,y-i),U (i-1))
+doMotionHead (x,y) (D i) = ((x,y+1),D (i-1))
+
+checkMotionTail :: Set.Set Pos -> Pos -> Pos -> (Set.Set Pos , Pos)
 checkMotionTail set head tail | closeToHead head tail = (set,tail)
-                              | otherwise = (set,tail)
+                              | otherwise = (Set.insert newTail set, newTail)
+    where
+        newTail = correctTail head tail
 
-correctTail :: Loc -> Loc -> Loc
--- head -> tail -> tail
-correctTail (x,y) (a,b) | x == a = (a,b+(y-b)) --move on y
-                        | y == b = (a+(x-a),b) --move on x
-                        | otherwise = (a+(x-a),b+(y-b)) -- move diagonal
+            -- head -> tail -> tail
+correctTail :: Pos -> Pos -> Pos
+correctTail (x,y) (a,b) | x == a    = (a,fb)
+                        | y == b    = (fa,b)
+                        | otherwise = (fa,fb)
+    where
+        fa = let m = if a > x then 1 else (-1) in a+(x-a) + (m * fst q)
+        fb = let m = if b > x then 1 else (-1) in b+(y-b) + (m * snd q)
+        q  | abs (a-x) > abs (b-y) = (1,0)
+           | otherwise = (0,1)
 
-closeToHead :: Loc -> Loc -> Bool
--- head -> tail -> bool
+            -- head -> tail -> bool
+closeToHead :: Pos -> Pos -> Bool
 closeToHead (x,y) (a,b) = abs (x-a) <= 1 && abs (y-b) <= 1
 
-type Loc = (Int,Int)
+type Pos = (Int,Int)
 data Motion = L Int
             | R Int
             | U Int
             | D Int
     deriving Show
+
+motionEmpty :: Motion -> Bool
+motionEmpty (L i) = i == 0
+motionEmpty (R i) = i == 0
+motionEmpty (U i) = i == 0
+motionEmpty (D i) = i == 0
+
