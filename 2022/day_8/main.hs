@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 module Main where
 
 import Data.Char
@@ -9,42 +10,10 @@ main = do
     putStr "parsed\ntotal count: "
     print $ length parsed * length (head parsed)
     print $ partOne input
-    print $ partTwo input
-
-
+    print $ part2 parsed
 
 partOne :: String -> String
 partOne = show . sum . map sum . checkAll checkRow. parseList
-
-partTwo :: String -> String
-partTwo = show . maximum . map maximum . checkAll scenicRow . parseList
-
-scenicRow :: List2D -> ItemIndex -> [Int] -> [Int]
-scenicRow list (x,y) result | y == length (head list) - 1 = sceneIndex list (x,y) : result
-                            | otherwise = scenicRow list (x,y+1) (sceneIndex list (x,y) : result)
-
-sceneIndex :: List2D -> ItemIndex -> Int
-sceneIndex list index = sceneTop list index index 0 + sceneBottem list index index 0 + sceneLeft list index index 0 + sceneRight list index index 0
-
-sceneTop :: List2D -> ItemIndex -> ItemIndex -> Int -> Int
-sceneTop _ _ (0,_) result = result
-sceneTop list (x,y) (v,h) result | (list!!x)!!y <= (list!!(v-1))!!h = sceneTop list (x,y) (v-1,h) (result+1)
-                                 | otherwise = result
-
-sceneBottem :: List2D -> ItemIndex -> ItemIndex -> Int -> Int
-sceneBottem list (x,y) (v,h) result | v == length list -1 = result
-                                    | (list!!x)!!y <= (list!!(v+1))!!h = sceneBottem list (x,y) (v+1,h) (result+1)
-                                    | otherwise = result
-
-sceneLeft :: List2D -> ItemIndex -> ItemIndex -> Int -> Int
-sceneLeft _ _ (_,0) result = result
-sceneLeft list (x,y) (v,h) result | (list!!x)!!y <= (list!!v)!!(h-1) = sceneLeft list (x,y) (v,h-1) (result + 1)
-                                  | otherwise = result
-
-sceneRight :: List2D -> ItemIndex -> ItemIndex -> Int -> Int
-sceneRight list (x,y) (v,h) result | h == length (head list) - 1 = result
-                                   | (list!!x)!!y <= (list!!v)!!(h+1) = sceneRight list (x,y) (v,h+1) (result +1)
-                                   | otherwise = result
 
 parseList :: String -> List2D
 parseList = foldl f [] . reverse . lines
@@ -86,3 +55,54 @@ printList ls = do mapM_ (putStrLn . concatMap show) ls
 
 type ItemIndex = (Int,Int)
 type List2D = [[Int]]
+
+----part two
+
+part2 :: List2D -> Int
+part2 l = maximum $ map (scenicScore l) $ indexList l
+
+indexList :: List2D -> [ItemIndex]
+indexList l =  concatMap (\y -> map (,y) xs) ys
+    where
+        lengthX = maximum $ map length l
+        lengthY = length l
+        xs = [0..lengthX-1]
+        ys = [0..lengthY-1]
+
+
+scenicScore :: List2D -> ItemIndex -> Int
+scenicScore l i = 
+    let
+        sT = scenicScoreTop l i
+        sL = scenicScoreLeft l i
+        sB = scenicScoreBottem l i
+        sR = scenicScoreRight l i
+    in
+        sT * sL * sB * sR
+
+scenicScoreTop :: List2D -> ItemIndex -> Int
+scenicScoreTop = scenicScoreDirection (\(x,y)-> (x,y-1))
+
+scenicScoreLeft :: List2D -> ItemIndex -> Int
+scenicScoreLeft = scenicScoreDirection (\(x,y)-> (x-1,y))
+
+scenicScoreBottem :: List2D -> ItemIndex -> Int
+scenicScoreBottem = scenicScoreDirection (\(x,y)-> (x,y+1))
+
+scenicScoreRight :: List2D -> ItemIndex -> Int
+scenicScoreRight = scenicScoreDirection (\(x,y)-> (x+1,y))
+
+scenicScoreDirection ::  (ItemIndex -> ItemIndex) -> List2D -> ItemIndex -> Int
+scenicScoreDirection p l i = f 0 i
+    where
+        current = lookUp l i        
+        maxY = length l
+        maxX = maximum $ map length l
+        f :: Int -> ItemIndex -> Int
+        f result index@(x,y) | x <= 0 || y <= 0 = result
+                             | x > maxX-2 || y > maxY-2 = result
+                             | lookUp l (p index) >= current = result + 1
+                             | otherwise = f (result + 1) $ p index
+
+lookUp :: List2D -> ItemIndex -> Int
+lookUp l (x,y) = (l!!x)!!y
