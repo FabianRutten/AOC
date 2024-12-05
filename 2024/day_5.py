@@ -65,34 +65,33 @@ print(f"input: {solve(get_file_contents())}")
 
 def fix_with_rules(rules:list[tuple[int,int]], nums:list[int])->list[int]:
     print(f"Initial nums: {nums}")
-    for i, num in enumerate(nums):
-        print(f"Checking num: {num} at index: {i}")
-        for rule in rules:
-            print(f"Applying rule: {rule}")
-            if rule[0][1] == num:
-                print(f"Rule matches num: {num}")
-                if nums[i:].count(rule[0][0]) != 0:
-                    print(f"Rule {rule} is applicable, modifying nums: {nums}")
-                    # swap m
-                    j = nums.index(rule[0][0],i)
-                    h = nums.index(rule[0][1],i)
-                    print(f"Swapping {nums[h]}, at {h} with {rule[0][0]}")
-                    print(f"Swapping {nums[j]}, at {j} with {num}")
-                    nums[h] = rule[0][0]
-                    print(f"half_swap: {nums}")
-                    nums[j] = num
-                    print(f"Modified nums: {nums}")
-                    continue
-                print(f"Rule {rule} is not applicable")
+    for rule in rules:
+        print(f'Rule: {rule}')
+        try:
+            first = nums.index(rule[0][0])
+            second = nums.index(rule[0][1])
+            if first < second:
+                print(f"Holds! ----------")
+                continue
+            print(f"Current nums: {nums}")
+            nums[second] = rule[0][0]
+            nums[first] = rule[0][1]
+            print(f"Nums after applying rule: {nums} -----------")
+        except ValueError:
+            print("Rule not applicable! -----------")
     print(f"Final nums: {nums}")
-    return nums
+    print("=============================================")
+    if not check_rules(rules,nums):
+        return fix_with_rules(rules,nums)
+    return nums    
 
 def solve_better(input:tuple[str,str])->int:
     all_rules,all_pages =read(input)
     rules = [rules_from_input(x) for x in all_rules.splitlines()]
     pages = [pages_to_nums(x) for x in all_pages.splitlines()]
     faulty_pages = [x for x in pages if not check_rules(rules,x)]
-    return sum([get_center_value(fix_with_rules(rules,x)) for x in faulty_pages])
+    middles = [get_center_value(fix_with_rules(rules,x)) for x in faulty_pages]
+    return sum(middles)
 
 print(f"example: {solve_better(example)}")
 print(f"input: {solve_better(get_file_contents())}")
